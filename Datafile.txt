@@ -1,0 +1,101 @@
+NeuroCongest State Vector
+
+Used by all modules.
+
+S(t) =
+[
+CWND(t),
+RTT(t),
+loss_rate(t),
+throughput(t),
+RSRP(t),
+SNR(t),
+Doppler(t),
+queue_depth(t)
+]
+
+Dimension = 8
+
+CWND Action Space
+A =
+{
+4 KB,
+8 KB,
+16 KB,
+32 KB,
+64 KB,
+128 KB,
+256 KB
+}
+
+7 discrete arms.
+
+TASI BSTE Architecture
+Input:
+100 × 8
+
+Conv1D:
+64 filters
+kernel = 7
+
+Conv1D:
+128 filters
+kernel = 5
+
+Conv1D:
+64 filters
+kernel = 3
+
+Global Average Pooling
+
+FC:
+64 → 8
+
+Output:
+Topology Fingerprint
+DRTD-CD Input
+x(t) =
+[
+RTT,
+RSRP,
+SNR,
+Doppler,
+ACK_gap
+]
+
+Output
+
+RTT_wireless
+
+RTT_queue
+
+confidence_score
+AMABCS LSTM
+Input:
+20 RTT history
+
+Hidden:
+64
+
+Layers:
+1
+
+Output:
+Predicted state
+
+Ŝ(t+k)
+PPO Network
+Input:
+S_integrated
+
+Hidden:
+256
+
+Hidden:
+256
+
+Hidden:
+256
+
+Output:
+7 CWND arms

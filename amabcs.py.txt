@@ -1,0 +1,445 @@
+
+
+# ============================================================
+# NeuroCongest – AMABCS
+# Anticipatory Multi-Armed Bandit CWND Scheduling
+# ============================================================
+
+# Components
+# ------------------------------------------------------------
+# 1. Channel State Collector
+# 2. Volatility Estimator
+# 3. LSTM-Tiny Forecaster
+# 4. Anticipatory Reward Estimator (ARE)
+# 5. UCB Arm Selector
+# 6. Adaptive Horizon Controller
+# 7. Online Learning Engine
+# 8. CWND Scheduler
+# ============================================================
+
+
+# ------------------------------------------------------------
+# CONFIGURATION
+# ------------------------------------------------------------
+
+HIDDEN_SIZE = 64
+
+NUM_LSTM_LAYERS = 1
+
+SEQUENCE_LENGTH = 20
+
+MIN_HORIZON = 3 ms
+
+MAX_HORIZON = 15 ms
+
+VOLATILITY_WINDOW = 10
+
+REWARD_WEIGHT = 0.6
+
+UCB_BETA = 2.0
+
+NUM_ARMS = 7
+
+
+# ------------------------------------------------------------
+# INPUT STATE VECTOR
+# ------------------------------------------------------------
+
+S(t) =
+[
+CWND(t),
+RTT(t),
+throughput(t),
+RSRP(t),
+SNR(t),
+RAT_type(t),
+Doppler(t),
+queue_depth(t)
+]
+
+
+# ------------------------------------------------------------
+# CWND ARMS
+# ------------------------------------------------------------
+
+A =
+{
+4KB,
+8KB,
+16KB,
+32KB,
+64KB,
+128KB,
+256KB
+}
+
+
+# ------------------------------------------------------------
+# VOLATILITY ESTIMATOR
+# ------------------------------------------------------------
+
+V(t) =
+
+Var(RSRP[t-W:t])
+
++
+
+Var(SNR[t-W:t])
+
+where
+
+W = 10
+
+
+IF
+
+V(t) > V_high
+
+THEN
+
+k = 3–5 ms
+
+ELSE
+
+k = 10–15 ms
+
+END IF
+
+
+# ------------------------------------------------------------
+# LSTM-TINY FORECASTER
+# ------------------------------------------------------------
+
+Input:
+
+20 RTT history
+
+Architecture:
+
+LSTM
+
+Hidden Size = 64
+
+Layers = 1
+
+Output:
+
+Ŝ(t+k)
+
+Predicted Future State
+
+
+# ------------------------------------------------------------
+# FORECASTED STATE
+# ------------------------------------------------------------
+
+Ŝ(t+k) =
+[
+CWND̂ ,
+RTT̂ ,
+throughput̂ ,
+RSRP̂ ,
+SNR̂ ,
+RAT̂ ,
+Doppler̂ ,
+queue_deptĥ
+]
+
+
+# ------------------------------------------------------------
+# ANTICIPATORY REWARD ESTIMATOR
+# ------------------------------------------------------------
+
+For each arm a_j
+
+Compute
+
+r̂(a_j,t+k)
+
+using
+
+f =
+
+α × norm_throughput
+
+−
+
+(1−α) × norm_latency
+
+where
+
+α = 0.6
+
+
+Normalization:
+
+Range [0,1]
+
+Based on
+
+Offline Training Dataset
+
+
+# ------------------------------------------------------------
+# UCB BONUS
+# ------------------------------------------------------------
+
+UCB_j =
+
+β ×
+
+√
+
+ln(t)
+/ n_j
+
+
+where
+
+β = 2.0
+
+n_j = arm selection count
+
+
+# ------------------------------------------------------------
+# ARM SCORE
+# ------------------------------------------------------------
+
+score_j =
+
+r̂(a_j,t+k)
+
++
+
+UCB_j
+
+
+# ------------------------------------------------------------
+# ARM SELECTION
+# ------------------------------------------------------------
+
+a*(t+k)
+
+=
+
+argmax(score_j)
+
+
+Selected Arm:
+
+Optimal Future CWND
+
+
+# ------------------------------------------------------------
+# PRE-EMPTIVE CWND SCHEDULER
+# ------------------------------------------------------------
+
+SET
+
+CWND
+
+=
+
+a*(t+k)
+
+before
+
+t+k arrives
+
+
+TCP sender becomes
+
+Proactive
+
+instead of
+
+Reactive
+
+
+# ------------------------------------------------------------
+# HORIZON ARRIVAL
+# ------------------------------------------------------------
+
+Wait
+
+until
+
+t+k
+
+Observe
+
+actual state
+
+S_actual(t+k)
+
+Observe
+
+actual reward
+
+r_actual
+
+
+# ------------------------------------------------------------
+# BANDIT UPDATE
+# ------------------------------------------------------------
+
+n_j
+
+=
+
+n_j + 1
+
+
+Update
+
+running mean reward
+
+
+Update
+
+UCB_j
+
+
+# ------------------------------------------------------------
+# ONLINE LSTM REFINEMENT
+# ------------------------------------------------------------
+
+L_forecast
+
+=
+
+MSE
+
+(
+
+Ŝ(t+k),
+
+S_actual(t+k)
+
+)
+
+
+Perform
+
+one gradient step
+
+
+Update
+
+LSTM weights
+
+
+# ------------------------------------------------------------
+# ADAPTIVE HORIZON UPDATE
+# ------------------------------------------------------------
+
+Recompute
+
+V(t+k)
+
+Adjust
+
+k
+
+for next cycle
+
+
+# ------------------------------------------------------------
+# ONLINE LOOP
+# ------------------------------------------------------------
+
+Collect state
+
+↓
+
+Estimate volatility
+
+↓
+
+Predict future state
+
+↓
+
+Evaluate all arms
+
+↓
+
+Apply UCB
+
+↓
+
+Select arm
+
+↓
+
+Set CWND
+
+↓
+
+Observe reward
+
+↓
+
+Update model
+
+↓
+
+Repeat
+
+
+# ------------------------------------------------------------
+# PERFORMANCE TARGETS
+# ------------------------------------------------------------
+
+Forecast Latency
+
+< 0.05 ms
+
+
+Bandit Evaluation
+
+< 0.05 ms
+
+
+Total Overhead
+
+< 0.15 ms
+
+
+Sub-ms Flows
+
+87.3%
+
+
+# ------------------------------------------------------------
+# OUTPUT TO PPO AGENT
+# ------------------------------------------------------------
+
+Predicted State
+
+Ŝ(t+k)
+
+Selected Arm
+
+a*(t+k)
+
+Expected Reward
+
+r̂(a_j,t+k)
+
+Volatility Index
+
+V(t)
+
+
+# ------------------------------------------------------------
+# CHECKPOINTS
+# ------------------------------------------------------------
+
+LSTM.pt
+
+Bandit_State.pkl
+
+Reward_History.csv
+
+Forecast_Logs.csv

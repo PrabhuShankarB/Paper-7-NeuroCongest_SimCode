@@ -1,0 +1,272 @@
+# ============================================================
+# NeuroCongest
+# Master Experiment Controller
+# ============================================================
+
+import os
+import subprocess
+import time
+
+# ------------------------------------------------------------
+# CONFIGURATION
+# ------------------------------------------------------------
+
+NUM_RUNS = 5
+
+NS3_EXECUTABLE = "./ns3"
+
+RESULT_DIR = "results"
+
+BASELINES = [
+
+    "cubic",
+
+    "bbr",
+
+    "westwood",
+
+    "dqntcp",
+
+    "neurocongest"
+
+]
+
+# ------------------------------------------------------------
+# UTILITIES
+# ------------------------------------------------------------
+
+def create_directories():
+
+    os.makedirs(
+        RESULT_DIR,
+        exist_ok=True
+    )
+
+    os.makedirs(
+        "logs",
+        exist_ok=True
+    )
+
+    os.makedirs(
+        "figures",
+        exist_ok=True
+    )
+
+def run_command(command):
+
+    print("\nExecuting:")
+    print(command)
+
+    result = subprocess.run(
+        command,
+        shell=True
+    )
+
+    if result.returncode != 0:
+
+        raise RuntimeError(
+            f"Failed: {command}"
+        )
+
+# ------------------------------------------------------------
+# TASI TRAINING
+# ------------------------------------------------------------
+
+def train_tasi():
+
+    print("\n================================")
+    print("Training TASI")
+    print("================================")
+
+    run_command(
+        "python tasi.py"
+    )
+
+# ------------------------------------------------------------
+# DRTD-CD TRAINING
+# ------------------------------------------------------------
+
+def train_drtdcd():
+
+    print("\n================================")
+    print("Training DRTD-CD")
+    print("================================")
+
+    run_command(
+        "python drtdcd.py"
+    )
+
+# ------------------------------------------------------------
+# AMABCS TRAINING
+# ------------------------------------------------------------
+
+def train_amabcs():
+
+    print("\n================================")
+    print("Training AMABCS")
+    print("================================")
+
+    run_command(
+        "python amabcs.py"
+    )
+
+# ------------------------------------------------------------
+# PPO TRAINING
+# ------------------------------------------------------------
+
+def train_ppo():
+
+    print("\n================================")
+    print("Training PPO")
+    print("================================")
+
+    run_command(
+        "python neurocongest.py"
+    )
+
+# ------------------------------------------------------------
+# RUN BASELINE
+# ------------------------------------------------------------
+
+def run_baseline(protocol,seed):
+
+    print("\n================================")
+    print(f"Running {protocol}")
+    print("================================")
+
+    command = (
+
+        f"{NS3_EXECUTABLE} run "
+        f"simulation "
+        f"--protocol={protocol} "
+        f"--seed={seed}"
+
+    )
+
+    run_command(command)
+
+# ------------------------------------------------------------
+# RUN ALL BASELINES
+# ------------------------------------------------------------
+
+def evaluate_protocol(protocol):
+
+    for seed in range(NUM_RUNS):
+
+        run_baseline(
+            protocol,
+            seed
+        )
+
+# ------------------------------------------------------------
+# METRICS
+# ------------------------------------------------------------
+
+def extract_metrics():
+
+    print("\n================================")
+    print("Extracting Metrics")
+    print("================================")
+
+    run_command(
+        "python metrics.py"
+    )
+
+# ------------------------------------------------------------
+# STATISTICS
+# ------------------------------------------------------------
+
+def statistical_validation():
+
+    print("\n================================")
+    print("Statistical Validation")
+    print("================================")
+
+    run_command(
+        "python statistics.py"
+    )
+
+# ------------------------------------------------------------
+# FIGURE GENERATION
+# ------------------------------------------------------------
+
+def generate_figures():
+
+    print("\n================================")
+    print("Generating Figures")
+    print("================================")
+
+    run_command(
+        "python figures.py"
+    )
+
+# ------------------------------------------------------------
+# TABLE GENERATION
+# ------------------------------------------------------------
+
+def generate_tables():
+
+    print("\n================================")
+    print("Generating Tables")
+    print("================================")
+
+    run_command(
+        "python tables.py"
+    )
+
+# ------------------------------------------------------------
+# MAIN PIPELINE
+# ------------------------------------------------------------
+
+def main():
+
+    start_time = time.time()
+
+    create_directories()
+
+    train_tasi()
+
+    train_drtdcd()
+
+    train_amabcs()
+
+    train_ppo()
+
+    for protocol in BASELINES:
+
+        evaluate_protocol(protocol)
+
+    extract_metrics()
+
+    statistical_validation()
+
+    generate_figures()
+
+    generate_tables()
+
+    elapsed = (
+        time.time()
+        -
+        start_time
+    )
+
+    print("\n================================")
+    print("NeuroCongest Complete")
+    print("================================")
+
+    print(
+        f"Elapsed Time: "
+        f"{elapsed:.2f} sec"
+    )
+
+# ------------------------------------------------------------
+# ENTRY
+# ------------------------------------------------------------
+
+if __name__ == "__main__":
+
+    main()
+
+# ============================================================
+# END
+# ============================================================

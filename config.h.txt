@@ -1,0 +1,17 @@
+#ifndef CONFIG_H
+#define CONFIG_H
+
+#define NUM_MACRO_BS 5
+#define NUM_SMALL_BS 20
+#define NUM_FEMTO_BS 10
+
+#define NUM_UES 200
+
+#define SIM_TIME 1000.0
+
+#define FREQUENCY 3.5e9
+#define BANDWIDTH 100e6
+
+#define PACKET_SIZE 1500
+
+#endif

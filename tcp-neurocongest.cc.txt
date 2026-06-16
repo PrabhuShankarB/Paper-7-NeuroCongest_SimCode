@@ -1,0 +1,169 @@
+#include "tcp-neurocongest.h"
+
+#include "ns3/log.h"
+#include "ns3/tcp-socket-state.h"
+#include "ns3/simulator.h"
+
+namespace ns3 {
+
+NS_LOG_COMPONENT_DEFINE ("TcpNeuroCongest");
+
+NS_OBJECT_ENSURE_REGISTERED (TcpNeuroCongest);
+
+TypeId
+TcpNeuroCongest::GetTypeId (void)
+{
+    static TypeId tid =
+        TypeId ("ns3::TcpNeuroCongest")
+        .SetParent<TcpCongestionOps> ()
+        .SetGroupName ("Internet")
+        .AddConstructor<TcpNeuroCongest> ();
+
+    return tid;
+}
+
+TcpNeuroCongest::TcpNeuroCongest ()
+    : TcpCongestionOps (),
+      m_rtt (0.0),
+      m_throughput (0.0),
+      m_lossRate (0.0),
+      m_rsrp (0.0),
+      m_snr (0.0),
+      m_doppler (0.0),
+      m_queueDepth (0.0),
+      m_selectedCwnd (65536)
+{
+}
+
+TcpNeuroCongest::TcpNeuroCongest (
+    const TcpNeuroCongest& sock)
+    : TcpCongestionOps (sock)
+{
+}
+
+TcpNeuroCongest::~TcpNeuroCongest ()
+{
+}
+
+std::string
+TcpNeuroCongest::GetName () const
+{
+    return "TcpNeuroCongest";
+}
+
+Ptr<TcpCongestionOps>
+TcpNeuroCongest::Fork ()
+{
+    return CopyObject<TcpNeuroCongest> (this);
+}
+
+void
+TcpNeuroCongest::CollectState (
+    Ptr<TcpSocketState> tcb,
+    const Time& rtt)
+{
+    m_rtt = rtt.GetMilliSeconds ();
+
+    m_throughput =
+        static_cast<double>(tcb->m_cWnd.Get ())
+        / std::max(1.0, m_rtt);
+
+    /*
+     * Placeholder:
+     * Obtain from PHY/MAC layer
+     */
+
+    m_rsrp = -85.0;
+    m_snr = 18.0;
+    m_doppler = 12.0;
+
+    /*
+     * Queue monitor
+     */
+
+    m_queueDepth = 15.0;
+}
+
+void
+TcpNeuroCongest::InvokeNeuroCongest ()
+{
+    /*
+     * ==================================================
+     * TASI
+     * ==================================================
+     *
+     * Detect handover
+     * Restore policy
+     * FWR / FSRA
+     *
+     * ==================================================
+     * DRTD-CD
+     * ==================================================
+     *
+     * RTT decomposition
+     *
+     * RTT_wireless
+     * RTT_queue
+     * confidence
+     *
+     * ==================================================
+     * AMABCS
+     * ==================================================
+     *
+     * Predict future state
+     * Select CWND arm
+     *
+     * ==================================================
+     * PPO
+     * ==================================================
+     *
+     * Final CWND action
+     *
+     */
+
+    /*
+     * Example selected arm:
+     * 64 KB
+     */
+
+    m_selectedCwnd = 65536;
+}
+
+void
+TcpNeuroCongest::ApplyCwndDecision (
+    Ptr<TcpSocketState> tcb)
+{
+    tcb->m_cWnd =
+        m_selectedCwnd;
+}
+
+void
+TcpNeuroCongest::IncreaseWindow (
+    Ptr<TcpSocketState> tcb,
+    uint32_t segmentsAcked)
+{
+    InvokeNeuroCongest ();
+
+    ApplyCwndDecision (tcb);
+}
+
+void
+TcpNeuroCongest::PktsAcked (
+    Ptr<TcpSocketState> tcb,
+    uint32_t segmentsAcked,
+    const Time& rtt)
+{
+    CollectState (tcb, rtt);
+}
+
+uint32_t
+TcpNeuroCongest::GetSsThresh (
+    Ptr<const TcpSocketState> state,
+    uint32_t bytesInFlight)
+{
+    return std::max (
+        2 * state->m_segmentSize,
+        state->m_cWnd.Get () / 2);
+}
+
+}

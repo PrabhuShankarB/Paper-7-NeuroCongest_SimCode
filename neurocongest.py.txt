@@ -1,0 +1,644 @@
+# ============================================================
+# NeuroCongest
+# Reinforcement Learning-Driven Adaptive Congestion Window
+# Prediction Framework for Heterogeneous 6G Networks
+# ============================================================
+
+# Components
+# ------------------------------------------------------------
+# 1. TASI
+#    - BSTE
+#    - MAML Meta-Learning
+#    - TFD
+#    - FWR
+#    - FSRA
+#
+# 2. DRTD-CD
+#    - CFE
+#    - RTT Decomposition
+#    - CWND Decision Gate
+#
+# 3. AMABCS
+#    - LSTM-Tiny
+#    - ARE
+#    - UCB Selector
+#
+# 4. PPO RL Agent
+#
+# 5. Conflict Resolution Engine
+#
+# 6. NS3 Interface Layer
+# ============================================================
+
+
+# ------------------------------------------------------------
+# GLOBAL STATE VECTOR
+# ------------------------------------------------------------
+
+S_integrated(t)
+
+=
+
+[
+CWND(t),
+RTT(t),
+loss_rate(t),
+throughput(t),
+RSRP(t),
+SNR(t),
+Doppler(t),
+queue_depth(t),
+
+RTT_wireless_est(t),
+RTT_queue_est(t),
+confidence_score(t),
+
+V(t),
+Ŝ(t+k),
+a*(t+k)
+]
+
+
+Integrated State Dimension
+
+=
+
+14
+
+
+# ------------------------------------------------------------
+# PPO RL AGENT
+# ------------------------------------------------------------
+
+Input
+
+S_integrated(t)
+
+Hidden Layer
+
+256
+
+Hidden Layer
+
+256
+
+Hidden Layer
+
+256
+
+Activation
+
+ReLU
+
+Output
+
+7 CWND Actions
+
+
+Action Space
+
+A
+
+=
+
+{
+4KB,
+8KB,
+16KB,
+32KB,
+64KB,
+128KB,
+256KB
+}
+
+
+# ------------------------------------------------------------
+# REWARD FUNCTION
+# ------------------------------------------------------------
+
+r(t)
+
+=
+
+α_r × norm_throughput(t)
+
+−
+
+(1−α_r) × norm_latency(t)
+
+−
+
+γ × loss_rate(t)
+
+
+where
+
+α_r = 0.5
+
+γ = 0.3
+
+
+# ------------------------------------------------------------
+# OFFLINE TRAINING PIPELINE
+# ------------------------------------------------------------
+
+Generate NS3 Dataset
+
+↓
+
+Train TASI
+
+↓
+
+Generate θ_base
+
+↓
+
+Generate TFD
+
+↓
+
+Generate Causal Dataset
+
+↓
+
+Train DRTD-CD
+
+↓
+
+Train LSTM Forecaster
+
+↓
+
+Train PPO Agent
+
+↓
+
+Save All Models
+
+
+# ------------------------------------------------------------
+# OFFLINE OUTPUTS
+# ------------------------------------------------------------
+
+θ_base.pt
+
+TFD.pkl
+
+BSTE.pt
+
+CFE.pt
+
+LSTM.pt
+
+PPO.pt
+
+
+# ------------------------------------------------------------
+# ONLINE OPERATION
+# ------------------------------------------------------------
+
+Receive ACK
+
+↓
+
+Update State
+
+↓
+
+Detect Handover
+
+↓
+
+TASI
+
+↓
+
+DRTD-CD
+
+↓
+
+AMABCS
+
+↓
+
+Conflict Resolution
+
+↓
+
+PPO Decision
+
+↓
+
+Apply CWND
+
+↓
+
+Observe Reward
+
+↓
+
+Update Online Modules
+
+
+# ------------------------------------------------------------
+# TASI MODULE
+# ------------------------------------------------------------
+
+IF
+
+Handover Detected
+
+THEN
+
+Retrieve target_BS_ID
+
+
+IF
+
+BS_ID ∈ TFD
+
+THEN
+
+Fast Weight Restoration
+
+θ_active
+
+=
+
+θ_base + Δθ_i
+
+
+ELSE
+
+Few-Shot Rapid Adaptation
+
+θ_FSRA
+
+=
+
+θ_base
+
++
+
+α∇θL
+
+
+Store New Imprint
+
+
+END IF
+
+END IF
+
+
+# ------------------------------------------------------------
+# DRTD-CD MODULE
+# ------------------------------------------------------------
+
+Input
+
+x(t)
+
+=
+
+[
+RTT,
+RSRP,
+SNR,
+Doppler,
+ACK_gap
+]
+
+
+Output
+
+RTT_wireless_est
+
+RTT_queue_est
+
+confidence_score
+
+
+Decision Rule
+
+IF
+
+RTT_queue_est > θ_congestion
+
+AND
+
+confidence_score > 0.85
+
+THEN
+
+Congestion Confirmed
+
+
+ELSE IF
+
+RTT_wireless_est
+
+>
+
+0.6 × RTT_observed
+
+THEN
+
+Wireless Event
+
+
+ELSE
+
+Mixed Event
+
+
+END IF
+
+
+# ------------------------------------------------------------
+# AMABCS MODULE
+# ------------------------------------------------------------
+
+Compute
+
+Volatility Index
+
+
+V(t)
+
+=
+
+Var(RSRP)
+
++
+
+Var(SNR)
+
+
+Predict
+
+Future State
+
+
+Ŝ(t+k)
+
+
+Evaluate
+
+All CWND Arms
+
+
+Compute
+
+Reward Estimates
+
+
+Apply
+
+UCB
+
+
+Select
+
+a*(t+k)
+
+
+Pre-emptively
+
+Set CWND
+
+
+# ------------------------------------------------------------
+# CONFLICT RESOLUTION ENGINE
+# ------------------------------------------------------------
+
+Case:
+
+DRTD-CD
+
+vs
+
+AMABCS
+
+
+IF
+
+confidence_score > 0.85
+
+THEN
+
+DRTD-CD
+
+takes priority
+
+
+Override
+
+AMABCS Decision
+
+
+Apply
+
+Proportional CWND Reduction
+
+
+ELSE
+
+Retain
+
+AMABCS CWND
+
+
+Apply
+
+12.5% Safety Reduction
+
+
+END IF
+
+
+# ------------------------------------------------------------
+# PPO DECISION
+# ------------------------------------------------------------
+
+Input
+
+S_integrated
+
+
+Output
+
+CWND Action
+
+
+a_t
+
+=
+
+πθ
+
+(
+
+S_integrated
+
+)
+
+
+Apply
+
+Selected CWND
+
+
+# ------------------------------------------------------------
+# ONLINE MODEL UPDATES
+# ------------------------------------------------------------
+
+Update
+
+Bandit Statistics
+
+
+Update
+
+Forecast Model
+
+
+Log
+
+Causal Attribution
+
+
+Log
+
+CWND Actions
+
+
+Log
+
+Rewards
+
+
+# ------------------------------------------------------------
+# NS3 INTERFACE
+# ------------------------------------------------------------
+
+Receive
+
+TCP State
+
+
+Receive
+
+ACK Events
+
+
+Receive
+
+RSRP
+
+
+Receive
+
+SNR
+
+
+Receive
+
+Handover Events
+
+
+Apply
+
+CWND
+
+
+Collect
+
+Performance Metrics
+
+
+# ------------------------------------------------------------
+# PERFORMANCE METRICS
+# ------------------------------------------------------------
+
+Mean RTT
+
+Throughput
+
+Packet Loss
+
+Recovery Latency
+
+Retransmissions
+
+Sub-ms Flow Ratio
+
+Reward
+
+CWND Stability
+
+
+# ------------------------------------------------------------
+# BASELINES
+# ------------------------------------------------------------
+
+TCP CUBIC
+
+TCP BBR
+
+TCP Westwood+
+
+DQN-TCP
+
+
+# ------------------------------------------------------------
+# TARGET RESULTS
+# ------------------------------------------------------------
+
+Recovery Latency
+
+0.90 ms
+
+
+Spurious Retransmissions
+
+−84.5%
+
+
+Sub-ms Flows
+
+87.3%
+
+
+Mean RTT
+
+0.38 ms
+
+
+# ------------------------------------------------------------
+# CHECKPOINTS
+# ------------------------------------------------------------
+
+θ_base.pt
+
+TFD.pkl
+
+BSTE.pt
+
+CFE.pt
+
+LSTM.pt
+
+PPO.pt
+
+Results.csv
+
+Metrics.csv
+
+Logs.csv
+
+
+# ============================================================
+# END OF NEUROCONGEST FRAMEWORK
+# ============================================================

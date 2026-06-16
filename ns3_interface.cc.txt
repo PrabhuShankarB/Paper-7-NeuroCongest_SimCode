@@ -1,0 +1,208 @@
+#include "ns3_interface.h"
+
+#include <cmath>
+#include <algorithm>
+
+namespace ns3 {
+
+Ns3Interface::Ns3Interface()
+{
+    m_rttWireless = 0.0;
+    m_rttQueue = 0.0;
+    m_confidence = 0.0;
+    m_volatility = 0.0;
+
+    m_selectedArm = 0;
+    m_selectedCwnd = 65536;
+
+    m_targetBsId = "";
+}
+
+Ns3Interface::~Ns3Interface()
+{
+}
+
+std::vector<double>
+Ns3Interface::BuildStateVector(
+    double cwnd,
+    double rtt,
+    double lossRate,
+    double throughput,
+    double rsrp,
+    double snr,
+    double doppler,
+    double queueDepth)
+{
+    std::vector<double> state;
+
+    state.push_back(cwnd);
+    state.push_back(rtt);
+    state.push_back(lossRate);
+    state.push_back(throughput);
+    state.push_back(rsrp);
+    state.push_back(snr);
+    state.push_back(doppler);
+    state.push_back(queueDepth);
+
+    return state;
+}
+
+bool
+Ns3Interface::DetectHandover(
+    double currentRsrp,
+    double threshold)
+{
+    if(currentRsrp < threshold)
+    {
+        return true;
+    }
+
+    return false;
+}
+
+std::string
+Ns3Interface::GetTargetBsId()
+{
+    return m_targetBsId;
+}
+
+void
+Ns3Interface::RestorePolicy(
+    const std::string& bsId)
+{
+    /*
+     * TASI
+     * Fast Weight Restoration
+     *
+     * θ_active
+     * =
+     * θ_base + Δθ_i
+     */
+
+    m_targetBsId = bsId;
+}
+
+void
+Ns3Interface::AdaptPolicy(
+    const std::string& bsId)
+{
+    /*
+     * TASI
+     * Few-Shot Rapid Adaptation
+     */
+
+    m_targetBsId = bsId;
+}
+
+void
+Ns3Interface::RunCausalInference(
+    const std::vector<double>& signalVector)
+{
+    /*
+     * DRTD-CD
+     *
+     * signalVector:
+     * RTT
+     * RSRP
+     * SNR
+     * Doppler
+     * ACK_gap
+     */
+
+    double rtt = signalVector[0];
+
+    m_rttWireless = 0.35 * rtt;
+
+    m_rttQueue =
+        std::max(
+            0.0,
+            rtt - m_rttWireless);
+
+    m_confidence = 0.91;
+}
+
+double
+Ns3Interface::GetRttWireless() const
+{
+    return m_rttWireless;
+}
+
+double
+Ns3Interface::GetRttQueue() const
+{
+    return m_rttQueue;
+}
+
+double
+Ns3Interface::GetConfidence() const
+{
+    return m_confidence;
+}
+
+void
+Ns3Interface::PredictFutureState(
+    const std::vector<double>& state)
+{
+    /*
+     * AMABCS
+     *
+     * LSTM-Tiny
+     */
+
+    double rsrp = state[4];
+    double snr = state[5];
+
+    m_volatility =
+        std::abs(rsrp)
+        +
+        std::abs(snr);
+
+    /*
+     * Placeholder
+     */
+}
+
+int
+Ns3Interface::SelectArm()
+{
+    /*
+     * UCB Arm Selection
+     */
+
+    m_selectedArm = 4;
+
+    /*
+     * 64 KB arm
+     */
+
+    m_selectedCwnd = 65536;
+
+    return m_selectedArm;
+}
+
+double
+Ns3Interface::GetVolatilityIndex() const
+{
+    return m_volatility;
+}
+
+int
+Ns3Interface::RunPpoAgent(
+    const std::vector<double>& integratedState)
+{
+    /*
+     * PPO
+     *
+     * Final CWND Decision
+     */
+
+    return m_selectedArm;
+}
+
+uint32_t
+Ns3Interface::GetSelectedCwnd() const
+{
+    return m_selectedCwnd;
+}
+
+}

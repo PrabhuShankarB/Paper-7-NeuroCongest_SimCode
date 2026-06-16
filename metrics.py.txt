@@ -1,0 +1,284 @@
+# ============================================================
+# NeuroCongest
+# Metrics Extraction and Statistical Validation
+# ============================================================
+
+import xml.etree.ElementTree as ET
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+# ------------------------------------------------------------
+# LOAD FLOWMONITOR RESULTS
+# ------------------------------------------------------------
+
+XML_FILE = "neurocongest-results.xml"
+
+tree = ET.parse(XML_FILE)
+root = tree.getroot()
+
+# ------------------------------------------------------------
+# STORAGE
+# ------------------------------------------------------------
+
+rtt_list = []
+throughput_list = []
+loss_list = []
+tx_packets = []
+rx_packets = []
+
+# ------------------------------------------------------------
+# PARSE FLOWS
+# ------------------------------------------------------------
+
+for flow in root.iter("FlowStats"):
+
+    tx = int(flow.attrib.get("txPackets", 0))
+    rx = int(flow.attrib.get("rxPackets", 0))
+
+    tx_bytes = int(flow.attrib.get("txBytes", 0))
+    rx_bytes = int(flow.attrib.get("rxBytes", 0))
+
+    delay_sum = float(
+        flow.attrib.get("delaySum", "0ns")
+        .replace("ns","")
+    )
+
+    duration = float(
+        flow.attrib.get("timeLastRxPacket", "1ns")
+        .replace("ns","")
+    )
+
+    if rx > 0:
+
+        mean_rtt = delay_sum / rx
+
+        rtt_list.append(mean_rtt)
+
+    if duration > 0:
+
+        throughput = (
+            rx_bytes * 8
+        ) / duration
+
+        throughput_list.append(throughput)
+
+    if tx > 0:
+
+        loss = (
+            (tx-rx)/tx
+        ) * 100
+
+        loss_list.append(loss)
+
+    tx_packets.append(tx)
+    rx_packets.append(rx)
+
+# ------------------------------------------------------------
+# RTT
+# ------------------------------------------------------------
+
+mean_rtt = np.mean(rtt_list)
+
+std_rtt = np.std(rtt_list)
+
+# ------------------------------------------------------------
+# THROUGHPUT
+# ------------------------------------------------------------
+
+mean_throughput = np.mean(
+    throughput_list
+)
+
+std_throughput = np.std(
+    throughput_list
+)
+
+# ------------------------------------------------------------
+# PACKET LOSS
+# ------------------------------------------------------------
+
+mean_loss = np.mean(
+    loss_list
+)
+
+std_loss = np.std(
+    loss_list
+)
+
+# ------------------------------------------------------------
+# RETRANSMISSION RATIO
+# ------------------------------------------------------------
+
+total_tx = np.sum(tx_packets)
+
+total_rx = np.sum(rx_packets)
+
+retransmission_ratio = (
+    (total_tx-total_rx)
+    /
+    total_tx
+) * 100
+
+# ------------------------------------------------------------
+# SUB-MS FLOWS
+# ------------------------------------------------------------
+
+sub_ms_flows = 0
+
+for rtt in rtt_list:
+
+    if rtt < 1e6:
+        sub_ms_flows += 1
+
+sub_ms_percentage = (
+    sub_ms_flows
+    /
+    len(rtt_list)
+) * 100
+
+# ------------------------------------------------------------
+# 95% CI
+# ------------------------------------------------------------
+
+def confidence_interval(x):
+
+    mean = np.mean(x)
+
+    std = np.std(x)
+
+    n = len(x)
+
+    ci = (
+        mean
+        -
+        1.96*(std/np.sqrt(n)),
+        mean
+        +
+        1.96*(std/np.sqrt(n))
+    )
+
+    return ci
+
+rtt_ci = confidence_interval(rtt_list)
+
+throughput_ci = confidence_interval(
+    throughput_list
+)
+
+loss_ci = confidence_interval(
+    loss_list
+)
+
+# ------------------------------------------------------------
+# RESULTS TABLE
+# ------------------------------------------------------------
+
+results = pd.DataFrame({
+
+"Metric":[
+
+"RTT",
+
+"Throughput",
+
+"Packet Loss",
+
+"Retransmission Ratio",
+
+"Sub-ms Flows"
+
+],
+
+"Mean":[
+
+mean_rtt,
+
+mean_throughput,
+
+mean_loss,
+
+retransmission_ratio,
+
+sub_ms_percentage
+
+]
+
+})
+
+# ------------------------------------------------------------
+# SAVE RESULTS
+# ------------------------------------------------------------
+
+results.to_csv(
+    "metrics.csv",
+    index=False
+)
+
+# ------------------------------------------------------------
+# PRINT SUMMARY
+# ------------------------------------------------------------
+
+print("\n==============================")
+print(" NeuroCongest Results")
+print("==============================\n")
+
+print(
+    f"Mean RTT: "
+    f"{mean_rtt:.4f}"
+)
+
+print(
+    f"RTT 95% CI: "
+    f"{rtt_ci}"
+)
+
+print(
+    f"Mean Throughput: "
+    f"{mean_throughput:.4f}"
+)
+
+print(
+    f"Throughput 95% CI: "
+    f"{throughput_ci}"
+)
+
+print(
+    f"Packet Loss: "
+    f"{mean_loss:.4f}%"
+)
+
+print(
+    f"Loss 95% CI: "
+    f"{loss_ci}"
+)
+
+print(
+    f"Retransmission Ratio: "
+    f"{retransmission_ratio:.4f}%"
+)
+
+print(
+    f"Sub-ms Flows: "
+    f"{sub_ms_percentage:.2f}%"
+)
+
+# ------------------------------------------------------------
+# OPTIONAL BASELINE COMPARISON
+# ------------------------------------------------------------
+
+def welch_test(
+    neurocongest_results,
+    baseline_results):
+
+    t,p = stats.ttest_ind(
+        neurocongest_results,
+        baseline_results,
+        equal_var=False
+    )
+
+    return t,p
+
+# ============================================================
+# END
+# ============================================================

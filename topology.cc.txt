@@ -1,0 +1,16 @@
+#include "topology.h"
+#include "config.h"
+
+HetNetTopology::HetNetTopology()
+{
+}
+
+void
+HetNetTopology::CreateTopology()
+{
+    macroBs.Create(NUM_MACRO_BS);
+    smallBs.Create(NUM_SMALL_BS);
+    femtoBs.Create(NUM_FEMTO_BS);
+
+    ueNodes.Create(NUM_UES);
+}

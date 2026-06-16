@@ -1,0 +1,333 @@
+
+
+# ============================================================
+# NeuroCongest – DRTD-CD
+# Dual-Plane RTT Decomposition via Causal Disentanglement
+# ============================================================
+
+# Components
+# ------------------------------------------------------------
+# 1. Interventional Dataset Generator
+# 2. Causal Feature Encoder (CFE)
+# 3. Causal Loss Function
+# 4. Offline Training Pipeline
+# 5. Online Inference Engine
+# 6. CWND Decision Gate
+# 7. Continuous Refinement Logger
+# ============================================================
+
+
+# ------------------------------------------------------------
+# CONFIGURATION
+# ------------------------------------------------------------
+
+TRAINING_EPISODES = 50000
+
+BATCH_SIZE = 256
+
+EPOCHS = 200
+
+LEARNING_RATE = 0.001
+
+EARLY_STOPPING_PATIENCE = 10
+
+CONFIDENCE_THRESHOLD = 0.85
+
+CONGESTION_THRESHOLD = θ_congestion
+
+OPTIMIZER = Adam
+
+
+# ------------------------------------------------------------
+# INPUT SIGNAL VECTOR
+# ------------------------------------------------------------
+
+x(t) =
+[
+RTT(t),
+RSRP(t),
+SNR(t),
+Doppler(t),
+ACK_gap(t)
+]
+
+
+# ------------------------------------------------------------
+# CAUSAL VARIABLES
+# ------------------------------------------------------------
+
+C =
+{
+fading_depth,
+Doppler,
+SNR,
+RSRP
+}
+
+N =
+{
+queue_depth,
+competing_flows,
+ECN
+}
+
+
+# ------------------------------------------------------------
+# GROUND-TRUTH LABELS
+# ------------------------------------------------------------
+
+RTT_wireless_true(t)
+
+RTT_queue_true(t)
+
+
+# ------------------------------------------------------------
+# DO-CALCULUS INTERVENTION
+# ------------------------------------------------------------
+
+do(C = C_baseline)
+
+RTT_queue =
+RTT_observed − RTT_wireless
+
+under do(C)
+
+
+# ------------------------------------------------------------
+# CAUSAL FEATURE ENCODER (CFE)
+# ------------------------------------------------------------
+
+Input:
+5
+
+Hidden:
+64
+
+Hidden:
+64
+
+Hidden:
+64
+
+Activation:
+ReLU
+
+Output:
+3
+
+
+Outputs:
+
+RTT_wireless_pred
+
+RTT_queue_pred
+
+confidence_score
+
+
+# ------------------------------------------------------------
+# CAUSAL DECOMPOSITION LOSS
+# ------------------------------------------------------------
+
+L_CFE =
+
+MSE(
+RTT_wireless_pred,
+RTT_wireless_true
+)
+
++
+
+MSE(
+RTT_queue_pred,
+RTT_queue_true
+)
+
++
+
+λ × confidence_calibration_loss
+
+
+# ------------------------------------------------------------
+# OFFLINE TRAINING PIPELINE
+# ------------------------------------------------------------
+
+Generate 50,000 episodes
+
+Apply interventions
+
+Generate labels
+
+Train CFE
+
+Validate
+
+Save model
+
+
+Outputs:
+
+CFE.pt
+
+
+# ------------------------------------------------------------
+# ONLINE INFERENCE PIPELINE
+# ------------------------------------------------------------
+
+Receive ACK_t
+
+Compute RTT_observed
+
+Build x(t)
+
+Feed x(t) to CFE
+
+Obtain:
+
+RTT_wireless_est
+
+RTT_queue_est
+
+confidence_score
+
+
+# ------------------------------------------------------------
+# CWND DECISION GATE
+# ------------------------------------------------------------
+
+IF
+
+RTT_queue_est
+>
+θ_congestion
+
+AND
+
+confidence_score
+>
+0.85
+
+THEN
+
+Trigger congestion response
+
+Pass RTT_queue_est
+to PPO RL Agent
+
+
+ELSE IF
+
+RTT_wireless_est
+
+>
+
+0.6 × RTT_observed
+
+THEN
+
+Suppress CWND reduction
+
+Maintain current CWND
+
+
+ELSE
+
+Generate confidence-weighted blend
+
+Forward blended signal
+to PPO RL Agent
+
+
+END IF
+
+
+# ------------------------------------------------------------
+# CONFLICT RESOLUTION
+# ------------------------------------------------------------
+
+If DRTD-CD and AMABCS disagree:
+
+IF
+
+confidence_score > 0.85
+
+THEN
+
+DRTD-CD takes priority
+
+Override AMABCS CWND
+
+Apply proportional reduction
+
+
+ELSE
+
+Retain AMABCS CWND
+
+Apply 12.5% cautionary reduction
+
+
+END IF
+
+
+# ------------------------------------------------------------
+# CONTINUOUS REFINEMENT
+# ------------------------------------------------------------
+
+Log:
+
+RTT_observed
+
+RTT_wireless_est
+
+RTT_queue_est
+
+confidence_score
+
+CWND_action
+
+reward
+
+
+Store for future retraining
+
+
+# ------------------------------------------------------------
+# PERFORMANCE TARGETS
+# ------------------------------------------------------------
+
+Causal Attribution Accuracy
+> 91%
+
+Inference Latency
+< 0.1 ms
+
+Spurious CWND Reductions
+≈ 0%
+
+Spurious Retransmissions
+Reduced by 84.5%
+
+
+# ------------------------------------------------------------
+# OUTPUT TO PPO AGENT
+# ------------------------------------------------------------
+
+RTT_queue_est
+
+RTT_wireless_est
+
+confidence_score
+
+blended_signal
+
+
+# ------------------------------------------------------------
+# CHECKPOINTS
+# ------------------------------------------------------------
+
+CFE.pt
+
+training_logs.csv
+
+validation_metrics.csv

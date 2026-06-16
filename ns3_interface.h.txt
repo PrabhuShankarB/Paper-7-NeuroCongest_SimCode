@@ -1,0 +1,97 @@
+#ifndef NS3_INTERFACE_H
+#define NS3_INTERFACE_H
+
+#include <vector>
+#include <string>
+
+namespace ns3 {
+
+class Ns3Interface
+{
+public:
+
+    Ns3Interface();
+
+    virtual ~Ns3Interface();
+
+    /*
+     * TCP State Collection
+     */
+    std::vector<double> BuildStateVector(
+        double cwnd,
+        double rtt,
+        double lossRate,
+        double throughput,
+        double rsrp,
+        double snr,
+        double doppler,
+        double queueDepth);
+
+    /*
+     * TASI Interface
+     */
+    bool DetectHandover(
+        double currentRsrp,
+        double threshold);
+
+    std::string GetTargetBsId();
+
+    void RestorePolicy(
+        const std::string& bsId);
+
+    void AdaptPolicy(
+        const std::string& bsId);
+
+    /*
+     * DRTD-CD Interface
+     */
+    void RunCausalInference(
+        const std::vector<double>& signalVector);
+
+    double GetRttWireless() const;
+
+    double GetRttQueue() const;
+
+    double GetConfidence() const;
+
+    /*
+     * AMABCS Interface
+     */
+    void PredictFutureState(
+        const std::vector<double>& state);
+
+    int SelectArm();
+
+    double GetVolatilityIndex() const;
+
+    /*
+     * PPO Interface
+     */
+    int RunPpoAgent(
+        const std::vector<double>& integratedState);
+
+    /*
+     * CWND Interface
+     */
+    uint32_t GetSelectedCwnd() const;
+
+private:
+
+    double m_rttWireless;
+
+    double m_rttQueue;
+
+    double m_confidence;
+
+    double m_volatility;
+
+    int m_selectedArm;
+
+    uint32_t m_selectedCwnd;
+
+    std::string m_targetBsId;
+};
+
+}
+
+#endif

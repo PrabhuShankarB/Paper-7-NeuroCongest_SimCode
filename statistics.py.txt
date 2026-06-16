@@ -1,0 +1,235 @@
+# ============================================================
+# NeuroCongest
+# Statistical Validation Module
+# ============================================================
+
+import pandas as pd
+import numpy as np
+from scipy.stats import ttest_ind
+
+# ------------------------------------------------------------
+# LOAD RESULTS
+# ------------------------------------------------------------
+
+neurocongest = pd.read_csv(
+    "results/neurocongest.csv"
+)
+
+cubic = pd.read_csv(
+    "results/cubic.csv"
+)
+
+bbr = pd.read_csv(
+    "results/bbr.csv"
+)
+
+westwood = pd.read_csv(
+    "results/westwood.csv"
+)
+
+dqntcp = pd.read_csv(
+    "results/dqntcp.csv"
+)
+
+# ------------------------------------------------------------
+# CONFIDENCE INTERVAL
+# ------------------------------------------------------------
+
+def confidence_interval(values):
+
+    mean = np.mean(values)
+
+    std = np.std(values)
+
+    n = len(values)
+
+    ci_low = mean - 1.96 * (std / np.sqrt(n))
+
+    ci_high = mean + 1.96 * (std / np.sqrt(n))
+
+    return mean, std, ci_low, ci_high
+
+# ------------------------------------------------------------
+# WELCH T TEST
+# ------------------------------------------------------------
+
+def welch_test(a,b):
+
+    t_stat,p_value = ttest_ind(
+        a,
+        b,
+        equal_var=False
+    )
+
+    return p_value
+
+# ------------------------------------------------------------
+# METRICS
+# ------------------------------------------------------------
+
+metrics = [
+
+    "RTT",
+
+    "Throughput",
+
+    "PacketLoss",
+
+    "Retransmission",
+
+    "RecoveryLatency",
+
+    "SubMsFlows"
+
+]
+
+# ------------------------------------------------------------
+# TABLE 6
+# ------------------------------------------------------------
+
+table6 = []
+
+for metric in metrics:
+
+    nc = neurocongest[metric]
+
+    mean,std,ci_low,ci_high = \
+        confidence_interval(nc)
+
+    p_cubic = welch_test(
+        nc,
+        cubic[metric]
+    )
+
+    p_bbr = welch_test(
+        nc,
+        bbr[metric]
+    )
+
+    p_westwood = welch_test(
+        nc,
+        westwood[metric]
+    )
+
+    p_dqntcp = welch_test(
+        nc,
+        dqntcp[metric]
+    )
+
+    table6.append([
+
+        metric,
+
+        mean,
+
+        std,
+
+        ci_low,
+
+        ci_high,
+
+        p_cubic,
+
+        p_bbr,
+
+        p_westwood,
+
+        p_dqntcp
+    ])
+
+# ------------------------------------------------------------
+# SAVE TABLE
+# ------------------------------------------------------------
+
+columns = [
+
+    "Metric",
+
+    "Mean",
+
+    "StdDev",
+
+    "CI_Low",
+
+    "CI_High",
+
+    "p_CUBIC",
+
+    "p_BBR",
+
+    "p_Westwood",
+
+    "p_DQNTCP"
+]
+
+table6 = pd.DataFrame(
+    table6,
+    columns=columns
+)
+
+table6.to_csv(
+    "Table6_StatisticalValidation.csv",
+    index=False
+)
+
+# ------------------------------------------------------------
+# LATEX EXPORT
+# ------------------------------------------------------------
+
+with open(
+    "Table6_StatisticalValidation.tex",
+    "w"
+) as f:
+
+    f.write(
+        table6.to_latex(
+            index=False,
+            float_format="%.4f"
+        )
+    )
+
+# ------------------------------------------------------------
+# SUMMARY REPORT
+# ------------------------------------------------------------
+
+print(
+"\n====================================="
+)
+
+print(
+"Table 6 Statistical Validation"
+)
+
+print(
+"=====================================\n"
+)
+
+print(table6)
+
+# ------------------------------------------------------------
+# SIGNIFICANCE FLAGGING
+# ------------------------------------------------------------
+
+alpha = 0.05
+
+for _,row in table6.iterrows():
+
+    metric = row["Metric"]
+
+    print(f"\n{metric}")
+
+    if row["p_CUBIC"] < alpha:
+        print(" Significant vs CUBIC")
+
+    if row["p_BBR"] < alpha:
+        print(" Significant vs BBR")
+
+    if row["p_Westwood"] < alpha:
+        print(" Significant vs Westwood+")
+
+    if row["p_DQNTCP"] < alpha:
+        print(" Significant vs DQN-TCP")
+
+# ============================================================
+# END
+# ============================================================

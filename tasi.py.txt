@@ -1,0 +1,314 @@
+# ============================================================
+# NeuroCongest – TASI
+# Topology-Aware Synaptic Imprinting
+# ============================================================
+
+# Components
+# ------------------------------------------------------------
+# 1. Dataset Loader
+# 2. CNN-1D Base Station Topology Encoder (BSTE)
+# 3. PPO Meta-Policy Network (MPN)
+# 4. First-Order MAML Trainer
+# 5. Topology Fingerprint Database (TFD)
+# 6. Fast Weight Restoration (FWR)
+# 7. Few-Shot Rapid Adaptation (FSRA)
+# 8. Training Pipeline
+# 9. Evaluation Pipeline
+# ============================================================
+
+
+# ------------------------------------------------------------
+# CONFIGURATION
+# ------------------------------------------------------------
+
+NUM_BS = 35
+
+EPISODES_PER_BS = 500
+
+STEPS_PER_EPISODE = 200
+
+SEQUENCE_LENGTH = 100
+
+STATE_DIM = 8
+
+ACTION_DIM = 7
+
+INNER_LR = 0.01
+
+OUTER_LR = 0.001
+
+META_ITERATIONS = 2000
+
+FSRA_STEPS = 5
+
+
+# ------------------------------------------------------------
+# STATE VECTOR
+# ------------------------------------------------------------
+
+S(t) =
+[
+CWND(t),
+RTT(t),
+loss_rate(t),
+throughput(t),
+RSRP(t),
+SNR(t),
+Doppler(t),
+queue_depth(t)
+]
+
+
+# ------------------------------------------------------------
+# CWND ACTION SPACE
+# ------------------------------------------------------------
+
+A =
+{
+4KB,
+8KB,
+16KB,
+32KB,
+64KB,
+128KB,
+256KB
+}
+
+
+# ------------------------------------------------------------
+# DATASET
+# ------------------------------------------------------------
+
+D_i =
+{
+S(t),
+a(t),
+r(t)
+}
+
+≈100,000 tuples per BS
+
+
+# ------------------------------------------------------------
+# CNN-1D BSTE
+# ------------------------------------------------------------
+
+Input:
+(100 × 8)
+
+Conv1D(8 → 64, kernel=7)
+
+ReLU
+
+Conv1D(64 → 128, kernel=5)
+
+ReLU
+
+Conv1D(128 → 64, kernel=3)
+
+ReLU
+
+GlobalAveragePooling
+
+FC(64 → 8)
+
+Output:
+
+F_i =
+[
+μ_RTT,
+σ²_RTT,
+L_p,
+D_l,
+RAT_t,
+R_c,
+F_m,
+I_l
+]
+
+
+# ------------------------------------------------------------
+# PPO META POLICY NETWORK
+# ------------------------------------------------------------
+
+Input:
+8
+
+Hidden:
+256
+
+Hidden:
+256
+
+Hidden:
+256
+
+Output:
+7 CWND arms
+
+
+# ------------------------------------------------------------
+# MAML META TRAINING
+# ------------------------------------------------------------
+
+For each BS_i
+
+g_i = ∇θL_i(θ_base)
+
+φ_i = θ_base + αg_i
+
+where α = 0.01
+
+Meta loss:
+
+L_meta =
+Σ_i
+L_i(
+θ_base + α∇θL_i
+)
+
+Update:
+
+θ_base
+←
+θ_base
+−
+β∇θL_meta
+
+where β = 0.001
+
+
+# ------------------------------------------------------------
+# TOPOLOGY FINGERPRINT DATABASE
+# ------------------------------------------------------------
+
+TFD =
+
+{
+BS_ID :
+{
+Fingerprint : F_i,
+Delta       : Δθ_i
+}
+}
+
+Lookup complexity:
+
+O(1)
+
+
+# ------------------------------------------------------------
+# FAST WEIGHT RESTORATION
+# ------------------------------------------------------------
+
+Input:
+target_BS_ID
+
+Δθ_i = TFD[target_BS_ID]
+
+θ_active =
+θ_base + Δθ_i
+
+Load θ_active
+
+Resume TCP
+
+
+# ------------------------------------------------------------
+# FEW-SHOT RAPID ADAPTATION
+# ------------------------------------------------------------
+
+θ_FSRA = θ_base
+
+for k = 1..5
+
+θ_FSRA =
+θ_FSRA +
+α∇θL
+
+end
+
+Δθ_new =
+θ_FSRA − θ_base
+
+Insert into TFD
+
+
+# ------------------------------------------------------------
+# OFFLINE TRAINING PIPELINE
+# ------------------------------------------------------------
+
+Load datasets
+
+Train BSTE
+
+Extract fingerprints
+
+Train MAML
+
+Generate θ_base
+
+Generate Δθ_i
+
+Populate TFD
+
+Save:
+
+BSTE.pt
+
+θ_base.pt
+
+TFD.pkl
+
+
+# ------------------------------------------------------------
+# ONLINE PHASE
+# ------------------------------------------------------------
+
+Detect handover
+
+Get target_BS_ID
+
+If BS_ID exists in TFD
+
+    FWR
+
+Else
+
+    FSRA
+
+End
+
+Return θ_active
+
+
+# ------------------------------------------------------------
+# EVALUATION METRICS
+# ------------------------------------------------------------
+
+Recovery latency
+
+RTT
+
+Throughput
+
+Packet loss
+
+Reward
+
+CWND stability
+
+
+# ------------------------------------------------------------
+# BASELINES
+# ------------------------------------------------------------
+
+TCP CUBIC
+
+TCP BBR
+
+TCP Westwood+
+
+DQN-TCP
+
+NeuroCongest
